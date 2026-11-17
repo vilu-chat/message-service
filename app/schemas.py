@@ -70,6 +70,11 @@ class ConversationSummarySchema(Schema):
     unread_count = fields.Integer(dump_only=True)
     last_message = fields.Nested(MessageSchema, allow_none=True, dump_only=True)
     updated_at = fields.DateTime(dump_only=True)
+    last_read_seq = fields.Integer(dump_only=True)  # the caller's read position
+    member_count = fields.Integer(dump_only=True)  # active members, caller included
+    # Up to 4 active members other than the caller, oldest join first: names a direct chat
+    # (its only entry is the peer) and draws a group avatar without fetching the details.
+    member_preview_ids = fields.List(fields.UUID(), dump_only=True)
 
 
 class ConversationListArgsSchema(Schema):

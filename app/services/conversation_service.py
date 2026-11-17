@@ -120,6 +120,7 @@ def list_mine(user_id: uuid.UUID, limit: int, cursor: str | None = None) -> dict
         [(conversation.id, conversation.last_seq) for conversation, _ in rows if conversation.last_seq > 0]
     )
     by_key = {(m.conversation_id, m.seq): m for m in last_messages}
+    previews = member_repo.preview_for([conversation.id for conversation, _ in rows], user_id)
     items = [
         {
             "id": conversation.id,
@@ -129,6 +130,9 @@ def list_mine(user_id: uuid.UUID, limit: int, cursor: str | None = None) -> dict
             "unread_count": max(conversation.last_seq - member.last_read_seq, 0),
             "last_message": by_key.get((conversation.id, conversation.last_seq)),
             "updated_at": conversation.updated_at,
+            "last_read_seq": member.last_read_seq,
+            "member_count": previews.get(conversation.id, (1, []))[0],
+            "member_preview_ids": previews.get(conversation.id, (1, []))[1],
         }
         for conversation, member in rows
     ]

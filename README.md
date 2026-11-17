@@ -31,7 +31,7 @@ Swagger UI: <http://localhost:8002/docs> (assets load from a CDN). Health: `/hea
 | --- | --- | --- |
 | POST | `/direct` | `{user_id}`; 201 when created, 200 when it already existed |
 | POST | `` | Create a group: `{title, member_ids}`; the caller becomes admin |
-| GET | `` | My conversations with `last_message` and `unread_count`, newest activity first. Query: `limit` (default 30, max 100), `cursor`. Returns `{items, next_cursor}` |
+| GET | `` | My conversations with `last_message` and `unread_count`, newest activity first. Query: `limit` (default 30, max 100), `cursor`. Returns `{items, next_cursor}`. Each item also has `last_read_seq` (the caller's), `member_count` (active members, caller included) and `member_preview_ids` (up to 4 other active members, oldest join first; for a direct chat, the peer) |
 | GET | `/{id}` | Details and active members |
 | POST | `/{id}/messages` | `{client_msg_id, body}`; 201 when created, 200 when `client_msg_id` was already sent |
 | GET | `/{id}/messages` | `after_seq` or `before_seq` (not both), `limit` (default 50, max 100); oldest first, with `has_more` |

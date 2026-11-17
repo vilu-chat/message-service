@@ -125,3 +125,77 @@ def test_list_is_newest_activity_first_and_only_mine(client, as_user, make_group
     send(older["id"], ANNA, "bump")
     assert [c["title"] for c in items(client, as_user, ANNA)] == ["older", "newer"]
     assert newer["id"] not in [c["id"] for c in items(client, as_user, CECILIA)]
+
+
+def test_list_has_member_preview_for_direct(client, as_user):
+    client.post(f"{BASE}/direct", json={"user_id": str(BOB)}, headers=as_user(ANNA))
+
+    for me, peer in ((ANNA, BOB), (BOB, ANNA)):
+        [item] = items(client, as_user, me)
+        assert item["member_count"] == 2
+        assert item["member_preview_ids"] == [str(peer)]
+
+
+def test_list_member_preview_caps_at_four_and_excludes_me(client, as_user, make_group):
+    others = [uuid.uuid4() for _ in range(5)]
+    make_group(owner=ANNA, members=others)
+
+    [item] = items(client, as_user, ANNA)
+    assert item["member_count"] == 6
+    # Created together, so they share joined_at and the order falls back to user_id.
+    assert item["member_preview_ids"] == [str(u) for u in sorted(others)[:4]]
+
+
+def test_list_member_preview_skips_members_who_left(app, client, as_user, make_group):
+    from sqlalchemy import update
+
+    from app.extensions import db
+    from app.models import ConversationMember
+
+    cid = make_group(owner=ANNA, members=(BOB, CECILIA))["id"]
+    with app.app_context():
+        db.session.execute(
+            update(ConversationMember)
+            .where(ConversationMember.user_id == BOB)
+            .values(left_at=db.func.now())
+        )
+        db.session.commit()
+
+    [item] = items(client, as_user, ANNA)
+    assert item["id"] == cid
+    assert item["member_count"] == 2
+    assert item["member_preview_ids"] == [str(CECILIA)]
+
+
+def test_list_member_preview_when_alone(app, client, as_user, make_group):
+    from sqlalchemy import update
+
+    from app.extensions import db
+    from app.models import ConversationMember
+
+    make_group(owner=ANNA, members=(BOB,))
+    with app.app_context():
+        db.session.execute(
+            update(ConversationMember)
+            .where(ConversationMember.user_id == BOB)
+            .values(left_at=db.func.now())
+        )
+        db.session.commit()
+
+    [item] = items(client, as_user, ANNA)
+    assert item["member_count"] == 1
+    assert item["member_preview_ids"] == []
+
+
+def test_list_has_last_read_seq(client, as_user, make_group, send):
+    cid = make_group(owner=ANNA, members=(BOB,))["id"]
+    send(cid, ANNA)
+    send(cid, ANNA)
+
+    assert items(client, as_user, ANNA)[0]["last_read_seq"] == 2  # own sends advance it
+    assert items(client, as_user, BOB)[0]["last_read_seq"] == 0
+
+    client.put(f"{BASE}/{cid}/read", json={"seq": 1}, headers=as_user(BOB))
+    bob = items(client, as_user, BOB)[0]
+    assert bob["last_read_seq"] == 1
+    assert bob["unread_count"] == bob["last_seq"] - bob["last_read_seq"]
